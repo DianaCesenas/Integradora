@@ -29,7 +29,7 @@ class ClienteController:
     
         self.cargar_datos()
 
-    #CRUD 
+    #CRUD
 
     def cargar_datos(self):
         datos = self.modelo.get_all()
