@@ -1,5 +1,5 @@
 import flet as ft
-
+#style: remove unnecessary blank lines in view
 class MenuView:
     def __init__(self, page, al_clic_cliente, al_clic_instrumento, al_clic_sala, al_clic_reserva):
         self.page = page
@@ -41,4 +41,5 @@ class MenuView:
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
         contenedor.controls.append(ft.Container(columna_menu, alignment=ft.alignment.center, expand=True))
+
         contenedor.update()
