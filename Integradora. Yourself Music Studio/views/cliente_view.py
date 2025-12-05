@@ -5,15 +5,14 @@ class ClienteView:
         self.page = page
         self.controller = controller
         
-        # COLORES Y ESTILO
+    
         self.COLOR_VINO = "#A11F1F"
         self.COLOR_FONDO = "#F4F5F9"
         
         
         self.columna_con_lista_clientes = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
-        # CAMPOS DE TEXTO (Formularios)
-        # Definimos los campos para el formulario (Agregar/Editar)
+        
         self.campo_nombre = ft.TextField(label="Nombre", expand=True)
         self.campo_apellido = ft.TextField(label="Apellido", expand=True)
         
@@ -24,11 +23,11 @@ class ClienteView:
         self.campo_numero = ft.TextField(label="Número", expand=1)
         self.campo_colonia = ft.TextField(label="Colonia", expand=3)
         
-        # Variable para guardar la ventana emergente actual
+       
         self.ventana_emergente = None
 
     
-    #Estas son las ventanas emergentes:)
+   
     
 
     def mostrar_formulario_agregar(self, evento):
@@ -40,7 +39,7 @@ class ClienteView:
         self.campo_numero.value = ""
         self.campo_colonia.value = ""
         
-        # ventana
+        
         self.ventana_emergente = ft.AlertDialog(
             title=ft.Text("Nuevo Cliente"),
             content=ft.Column([
