@@ -9,7 +9,7 @@ class ClienteModel(ModeloBase):
     
     
     def validar(self, nombre, apellido, telefono, email, calle, numero, colonia):
-        # 1. Validar vacíos
+       
         if (not nombre.strip() or not apellido.strip() or 
             not telefono.strip() or not calle.strip() or 
             not numero.strip() or not colonia.strip()):
