@@ -1,0 +1,471 @@
+import flet as ft
+import datetime
+import sys
+import os
+total_horas=[12,1,2,3,4,5,6,7,8,9]
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+#FALTA LAS validaciones del form 
+# Intentamos importar el controlador. Si falla, usamos None.
+from Controlador.controlador_reservas import Controlador_Reservas
+from Views.Vistas_Base import VistaBase
+
+import flet as ft
+import datetime
+# Asegúrate de importar tus controladores y VistaBase
+# from Controlador.controlador_reservas import Controlador_Reservas
+# from Vistas.vista_base import VistaBase
+
+# ========================================
+# 1. CLASE SALA CARD (Se mantiene igual)
+# ========================================
+class SalaCard(ft.Container):
+    def __init__(self, sala_info, on_click_callback):
+        super().__init__()
+        self.sala_id = sala_info[0]
+        self.name = sala_info[1]
+        self.on_click_callback = on_click_callback
+        self.is_selected = False
+
+        self.icon_control = ft.Icon(name=ft.Icons.MEETING_ROOM, color="white", size=24)
+        self.text_control = ft.Text(self.name, color="white", size=11, weight="bold", text_align="center")
+
+        self.width = 90
+        self.height = 80
+        self.border_radius = 12
+        self.padding = 10
+        self.bgcolor = ft.Colors.TRANSPARENT
+        self.border = ft.border.all(1, "white54")
+        self.animate = ft.Animation(200, ft.AnimationCurve.EASE_OUT)
+        self.alignment = ft.alignment.center
+        
+        self.on_click = lambda e: self.on_click_callback(self)
+        
+        self.content = ft.Column([self.icon_control, self.text_control], alignment="center", spacing=5)
+
+    def set_selected(self, selected):
+        self.is_selected = selected
+        if self.is_selected:
+            self.bgcolor = "white"
+            self.border = ft.border.all(2, "white")
+            self.icon_control.color = "#A11F1F"
+            self.text_control.color = "#A11F1F"
+        else:
+            self.bgcolor = ft.Colors.TRANSPARENT
+            self.border = ft.border.all(1, "white54")
+            self.icon_control.color = "white"
+            self.text_control.color = "white"
+        self.update()
+
+# ==========================================
+# 2. CLASE VISTA SALAS (ADAPTADA)
+# ==========================================
+class VistaReservas(VistaBase):
+    def __init__(self, page: ft.Page):
+        # 1. Inicializamos variables de la clase antes de crear la UI
+        self.page = page
+        self.id_sala_seleccionada = None
+        self.fecha_seleccionada = datetime.date.today()
+        self.lista_tarjetas = []
+        
+        # 2. Generamos el contenido llamando a la función
+        Tabla = self.mostrar_tabla()
+
+        # 3. Llamamos al padre con los parámetros solicitados
+        # Nota: Ajusta la ruta "/reservas" o "/inicio" según tu lógica de navegación real
+        super().__init__(page, "/gestion_reservas", "Gestion de reservas", 0, Tabla)
+
+    def mostrar_tabla(self):
+        # Estilos
+        color_vino = "#A11F1F"
+        bg_inputs = "#F7F9FC"
+
+        # ---------------------------------------------------------
+        # A. LÓGICA DEL CALENDARIO
+        # ---------------------------------------------------------
+        self.texto_fecha = ft.Text(
+            value=self.fecha_seleccionada.strftime("%Y-%m-%d")
+        )
+
+        def on_date_change(e):
+            if self.date_picker.value:
+                fecha_obj = self.date_picker.value
+                self.fecha_seleccionada = fecha_obj.strftime("%Y-%m-%d")
+                self.texto_fecha.value = self.fecha_seleccionada 
+                self.texto_fecha.update()
+                
+                # Ejecutamos lógica extra (Asegúrate de tener este método definido en la clase si lo usas)
+                if hasattr(self, 'actualizar_horarios_ui'):
+                    self.actualizar_horarios_ui() 
+
+        self.date_picker = ft.DatePicker(on_change=on_date_change)
+        
+        # NOTA: Al heredar de una vista, a veces es mejor añadir overlay en el did_mount,
+        # pero si tu arquitectura lo permite aquí, está bien.
+        self.page.overlay.append(self.date_picker)
+
+        def abrir_calendario(e):
+            self.page.open(self.date_picker)
+
+        # ---------------------------------------------------------
+        # B. LÓGICA DE SALAS (GRID)
+        # ---------------------------------------------------------
+        # Simulamos datos si el controlador no responde
+        try:
+            salas_data = Controlador_Reservas.mostrarSalas()
+        except:
+            salas_data = [] # Fallback vacio
+
+        def gestionar_click_sala(tarjeta_clickeada):
+            self.id_sala_seleccionada = tarjeta_clickeada.sala_id
+            print(f"Sala seleccionada ID: {self.id_sala_seleccionada}")
+            
+            for t in self.lista_tarjetas:
+                t.set_selected(t == tarjeta_clickeada)
+            
+            if hasattr(self, 'actualizar_horarios_ui'):
+                self.actualizar_horarios_ui()
+
+        # Limpiamos y llenamos la lista
+        self.lista_tarjetas = []
+        for data in salas_data:
+            self.lista_tarjetas.append(SalaCard(data, gestionar_click_sala))
+
+        grid_salas = ft.GridView(
+            expand=True, runs_count=2, child_aspect_ratio=1.1, 
+            spacing=10, run_spacing=10, controls=self.lista_tarjetas
+        )
+
+        # ---------------------------------------------------------
+        # C. ELEMENTOS VISUALES
+        # ---------------------------------------------------------
+        
+        # BARRA LATERAL
+        sidebar_guinda = ft.Container(
+            width=280, height=500,
+            margin=ft.margin.only(left=30, top=20, bottom=20),
+            bgcolor=color_vino, border_radius=30, padding=25,
+            shadow=ft.BoxShadow(blur_radius=15, color=ft.Colors.with_opacity(0.4, color_vino)),
+            content=ft.Column([
+                ft.Text("Salas", size=22, weight="bold", color="white"),
+                ft.Text("Selecciona una sala", size=12, color="white70"),
+                ft.Divider(height=20, color="transparent"),
+                ft.Container(content=grid_salas, height=250), 
+                ft.Container(expand=True),
+                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="white70", size=16), ft.Text("Una sala a la vez", color="white70", size=12)], alignment="center")
+            ])
+        )
+
+        # DROPDOWNS
+        clientes_opciones = []
+        self.id_cliente = None
+        try:
+            lista_clientes = Controlador_Reservas.mostrarClientes()
+        except:
+            lista_clientes = []
+            
+        if lista_clientes and len(lista_clientes) > 0:
+            clientes_opciones = [ft.dropdown.Option(key=str(x[0]), text=str(x[1])) for x in lista_clientes]
+
+        # Métodos dummy si no están definidos en la clase para evitar crash en UI
+        func_asignar = self.asignar_id_cliente if hasattr(self, 'asignar_id_cliente') else lambda e: print("Cliente: ", e.control.value)
+        func_horas = self.actualizar_horas if hasattr(self, 'actualizar_horas') else lambda e: print("Hora: ", e.control.value)
+
+        self.dd_clientes = ft.Dropdown(
+            label="Lista de Clientes", 
+            options=clientes_opciones, 
+            on_change=func_asignar,
+            border_color="transparent", content_padding=10, text_size=14, expand=True
+        )
+
+        self.dd_hora_inicio = ft.Dropdown(
+            label="Inicio", options=[], disabled=True, 
+            on_change=func_horas,
+            border_color="transparent", text_size=14, expand=True
+        )
+        
+        self.dd_hora_fin = ft.Dropdown(
+            label="Fin", options=[], disabled=True, 
+            border_color="transparent", text_size=14, expand=True
+        )
+
+        # CONTENEDORES DE FORMULARIO
+        container_fecha = ft.Container(
+            width=400, bgcolor=bg_inputs, padding=10, border_radius=12, border=ft.border.all(1, "#E0E0E0"),
+            content=ft.Row([
+                ft.Container(content=ft.Icon(ft.Icons.CALENDAR_MONTH, color="white", size=20), bgcolor=color_vino, padding=10, border_radius=8),
+                ft.Column([ft.Text("Fecha Seleccionada:", size=10, color="grey"), self.texto_fecha], spacing=2, expand=True),
+                ft.IconButton(icon=ft.Icons.EDIT_CALENDAR, icon_color=color_vino, tooltip="Cambiar Fecha", on_click=abrir_calendario)
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+        )
+        
+        row_horarios = ft.Row([
+            ft.Container(width=180, bgcolor=bg_inputs, border_radius=12, border=ft.border.all(1, "#E0E0E0"),
+                content=ft.Row([ft.Container(padding=10, content=ft.Icon(ft.Icons.ACCESS_TIME_FILLED, color=color_vino, size=18)), self.dd_hora_inicio], vertical_alignment=ft.CrossAxisAlignment.CENTER)),
+            ft.Text("-", size=20, color="#ccc"),
+            ft.Container(width=180, bgcolor=bg_inputs, border_radius=12, border=ft.border.all(1, "#E0E0E0"),
+                content=ft.Row([ft.Container(padding=10, content=ft.Icon(ft.Icons.ACCESS_TIME, color=color_vino, size=18)), self.dd_hora_fin], vertical_alignment=ft.CrossAxisAlignment.CENTER))
+        ], alignment=ft.MainAxisAlignment.CENTER, spacing=15)
+         
+        self.personas = ft.TextField(
+            hint_text="#", label="N° de personas", width=60, height=40,
+            text_size=14, content_padding=5, keyboard_type=ft.KeyboardType.NUMBER,
+            border_color="transparent", text_align=ft.TextAlign.CENTER
+        )
+
+        # Cajas compuestas Cliente + Personas
+        box_cliente_left = ft.Container(
+            width=260, bgcolor=bg_inputs, border_radius=12,
+            padding=ft.padding.only(left=10, right=5), border=ft.border.all(1, "#E0E0E0"),
+            content=ft.Row([
+                ft.Icon(ft.Icons.PERSON, color=color_vino),
+                ft.Container(content=self.dd_clientes, expand=True)
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        )
+
+        box_personas_right = ft.Container(
+            width=130, bgcolor=bg_inputs, border_radius=12,
+            padding=ft.padding.all(5), border=ft.border.all(1, "#E0E0E0"),
+            content=ft.Row([
+                ft.Icon(ft.Icons.GROUPS, color=color_vino, size=20),
+                self.personas
+            ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        )
+
+        container_cliente = ft.Row(
+            controls=[box_cliente_left, box_personas_right],
+            spacing=10, alignment=ft.MainAxisAlignment.CENTER
+        )
+
+        # BOTONES
+        # Se asume que self.guardarReservacion existe
+        func_guardar = lambda e: self.guardarReservacion(self.texto_fecha.value, self.id_sala_seleccionada, self.dd_clientes.value, self.dd_hora_inicio.value, self.dd_hora_fin.value, self.personas.value) if hasattr(self, 'guardarReservacion') else print("Guardar")
+
+        boton = ft.ElevatedButton(
+            content=ft.Row([ft.Icon(ft.Icons.SAVE, color="white"), ft.Text("CONFIRMAR", weight=ft.FontWeight.BOLD)], alignment="center", spacing=5),
+            bgcolor="#3dbf54", color="white", height=55, width=220,
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=15), elevation=5),
+            on_click=func_guardar
+        )
+
+        # Se asume que self.cambiar_ruta existe
+        boton_ver = ft.ElevatedButton(
+            content=ft.Row([ft.Icon(ft.Icons.LIST_ALT, color="white"), ft.Text("VER LISTA", weight=ft.FontWeight.BOLD)], alignment="center", spacing=5),
+            bgcolor="#1976D2", color="white", height=55, width=220,
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=15), elevation=5),
+            on_click=lambda e: self.cambiar_ruta(e) if hasattr(self, 'cambiar_ruta') else print("Cambiar ruta")
+        )
+
+        fila_botones = ft.Row(
+            controls=[boton, boton_ver],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10
+        )
+
+        # ARMADO DEL FORMULARIO
+        form_content = ft.Column(
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=15, 
+            controls=[
+                ft.Text("Configurar Reserva", size=24, weight=ft.FontWeight.BOLD),
+                ft.Divider(height=5, color="transparent"),
+                ft.Text("Cliente y Acompañantes", size=12, weight=ft.FontWeight.BOLD, color="grey"),
+                container_cliente,
+                ft.Divider(height=5, color="transparent"),
+                ft.Text("Fecha", size=12, weight=ft.FontWeight.BOLD, color="grey"),
+                container_fecha,
+                ft.Divider(height=5, color="transparent"),
+                ft.Text("Horarios disponibles ", size=12, weight=ft.FontWeight.BOLD, color="grey"),
+                row_horarios,
+                ft.Divider(height=25, color="transparent"),
+                fila_botones 
+            ]
+        )
+
+        form_derecho = ft.Container(
+            expand=True, padding=30, alignment=ft.alignment.center, content=form_content
+        )
+
+        # ---------------------------------------------------------
+        # D. RETORNO FINAL (CONTENEDOR GLOBAL)
+        # ---------------------------------------------------------
+        # Unimos el sidebar y el formulario en una fila
+        fila_principal = ft.Row(
+            controls=[sidebar_guinda, form_derecho], 
+            expand=True, 
+            vertical_alignment=ft.CrossAxisAlignment.CENTER
+        )
+
+        # Envolvemos todo en un contenedor principal para retornarlo
+        contenedor_principal = ft.Container(
+            content=fila_principal,
+            bgcolor="white",
+            padding=0,
+            expand=True
+        )
+
+        return contenedor_principal
+    # --- LÓGICA DE ACTUALIZACIÓN DE HORARIOS --
+    # +
+    def cambiar_ruta(self):
+        self.page.go("/gestion_reservas")
+
+    def asignar_id_cliente(self,e):
+        self._id_cliente=self.dd_clientes.value
+        print(f"idcliente..{self.id_cliente}")
+
+    def actualizar_horarios_ui(self):
+        print("error 4")
+        if self.id_sala_seleccionada!= None:
+            # Simulamos lógica de horas disponibles
+            print("Calculando horas disponibles...")
+            opciones = []
+            self.sin_reservas=False
+            horas_procesadas=[]#Aqui guardamos las horan de inicio y termino registradas 
+            self.hrs_no_disp=[]
+            self.horas_disponibles=[]
+            print("Errror 5")
+            hora_time_delta=Controlador_Reservas.mostrarHorasDisponibles(self.texto_fecha.value,self.id_sala_seleccionada)#Lo que devuelve cursor.fetchall es en segundos
+            print(hora_time_delta)
+            if len(hora_time_delta)>0:
+                #Conviertimos un timedelta (los segundos) a texto 'HH:MM'
+                hora_formateada = [tuple(f"{int(td.total_seconds() // 3600):02}:{int((td.total_seconds() % 3600) // 60):02}"for td in fila )for fila in hora_time_delta]
+            
+                # Convertimos "10:00" -> 10 (Entero)
+                for inicio_str, fin_str in hora_formateada:
+                    self.h_inicio = int(inicio_str.split(":")[0])
+                    self.h_fin = int(fin_str.split(":")[0])
+                    horas_procesadas.append((self.h_inicio, self.h_fin))
+                        
+
+                #Aqui aregamos a una lista las horas de en medio entre hora incio y hora de termino
+                for inicio, fin in horas_procesadas:
+                    rango_ocupado = list(range(inicio, fin))
+                    self.hrs_no_disp.extend(rango_ocupado)
+
+                #Aqui obtenemos las horas disponibles,recorremos el total de horas y si la hora  no se encuentra en las horas no disponibles se agrega a la lista de horas disponibles 
+                for hora in total_horas:
+                    if (hora not in self.hrs_no_disp)and (hora!=9):
+                        hora_texto = f"{hora}:00"
+                        self.horas_disponibles.append(hora_texto)
+
+                for h in self.horas_disponibles:
+                    opciones.append(ft.dropdown.Option(h))
+                    self.dd_hora_inicio.options = opciones
+                    self.dd_hora_inicio.disabled = False
+                    self.dd_hora_inicio.value = None
+                    self.dd_hora_inicio.update()
+                    
+            else:
+                for hora in total_horas:
+                    if hora!=9:
+                        hora_texto = f"{hora}:00"
+                        self.horas_disponibles.append(hora_texto)
+                for h in self.horas_disponibles:
+                    opciones.append(ft.dropdown.Option(h))
+                self.dd_hora_inicio.options = opciones
+                self.sin_reservas=True
+
+                self.dd_hora_inicio.disabled = False
+                self.dd_hora_inicio.value = None
+                self.dd_hora_inicio.update()
+        else:
+            self.dd_hora_inicio.disabled = True
+            self.dd_hora_inicio.update()
+
+    def actualizar_horas(self,e):
+        if self.sin_reservas:
+            horas_actualizadas=[]
+            horas_actualizadas2=[]
+            opciones = []
+            self.hora_fin_disp=[]
+            self.horas_disponibles_ent=[]
+            hi_selected=self.dd_hora_inicio.value
+            if not hi_selected:
+                return
+            h_inicio_select = int(hi_selected.split(":")[0])
+            if h_inicio_select==12:
+                h_inicio_select=0
+            for hora_formato in self.horas_disponibles:
+                self.h= int(hora_formato.split(":")[0])
+                self.horas_disponibles_ent.append((self.h))
+
+            #hora_minima=int(min(self.horas_disponibles_ent))
+            hora_minima=12
+            if h_inicio_select==8:
+                horas_actualizadas.append(9)
+            
+            elif h_inicio_select!=8:
+                for h in self.horas_disponibles_ent:
+                    if h_inicio_select<hora_minima:
+                        if (h>h_inicio_select) and (h<hora_minima):
+                            if h==12:
+                                print("")
+                            elif h!=12:
+                                horas_actualizadas.append(h)
+            
+            for hora in horas_actualizadas:
+                        hora_texto = f"{hora}:00"
+                        horas_actualizadas2.append(hora_texto)
+            for h in horas_actualizadas2:
+                opciones.append(ft.dropdown.Option(h))
+            self.dd_hora_fin.options = opciones
+            self.dd_hora_fin.disabled = False
+            self.dd_hora_fin.value = None
+            self.dd_hora_fin.update() 
+        else:
+            horas_actualizadas=[]
+            horas_actualizadas2=[]
+            opciones = []
+            self.hora_fin_disp=[]
+            self.horas_disponibles_ent=[]
+            hi_selected=self.dd_hora_inicio.value
+            if not hi_selected:
+                return
+            h_inicio_select = int(hi_selected.split(":")[0])
+            hora_minima=int(min(self.hrs_no_disp))
+            if h_inicio_select==12:
+                h_inicio_select=0
+
+            for hora_formato in self.horas_disponibles:
+                self.h= int(hora_formato.split(":")[0])
+                self.horas_disponibles_ent.append((self.h))
+            if h_inicio_select==8:
+                horas_actualizadas.append(9)
+
+            elif h_inicio_select!=8:
+                for h in self.horas_disponibles_ent:
+                    if h_inicio_select<hora_minima:
+                        if (h>h_inicio_select) and (h<hora_minima):
+                            if h==12:
+                                print("")
+                            elif h!=12:
+                                horas_actualizadas.append(h)
+
+            for hora in horas_actualizadas:
+                        hora_texto = f"{hora}:00"
+                        horas_actualizadas2.append(hora_texto)
+            for h in horas_actualizadas2:
+                opciones.append(ft.dropdown.Option(h))
+            self.dd_hora_fin.options = opciones
+            self.dd_hora_fin.disabled = False
+            self.dd_hora_fin.value = None
+            self.dd_hora_fin.update() 
+
+    def guardarReservacion(self,fecha,id_sala,id_cliente,horai,horaf,p):
+        """if id_sala==None:
+            e.page.open(
+                ft.SnackBar(ft.Text("Debes ingresar una fecha de reservación"))
+            )
+        elif id_cliente==None:
+            pass
+        elif horai==None:
+            pass
+        elif horaf==None:
+            pass"""
+        print("entro 1")
+        resp= Controlador_Reservas.agregar_view(fecha,id_sala,id_cliente,horai,horaf,p)
+        if resp:
+            print("correcto")
+
+              
+
